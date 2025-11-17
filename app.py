@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import os
 
+# ==========================
+# Configuración de la página
+# ==========================
 st.set_page_config(page_title="Predicción Cardiovascular", page_icon="❤️")
 
 st.title("❤️ Predicción de Riesgo Cardiovascular")
@@ -10,9 +14,24 @@ st.write("Modelo de clasificación MLP entrenado por Mayra.")
 # ==========================
 # Cargar modelo
 # ==========================
+ARTIFACT_PATH = "Artefactos/v1/pipeline_MLP.joblib"
+
+
 @st.cache_resource
 def load_model():
-    return joblib.load("Artefactos/v1/pipeline_MLP.joblib")
+    # Verifica existencia del archivo
+    if not os.path.exists(ARTIFACT_PATH):
+        st.error(f"❌ No se encontró el modelo en: {ARTIFACT_PATH}")
+        st.stop()
+
+    try:
+        model = joblib.load(ARTIFACT_PATH)
+        return model
+    except Exception as e:
+        st.error("❌ Error al cargar el modelo. Revisa compatibilidad de versiones.")
+        st.code(str(e))
+        st.stop()
+
 
 model = load_model()
 
@@ -37,8 +56,9 @@ active = st.selectbox("Actividad física", ["Activo", "Inactivo"])
 # ==========================
 # Preparar DataFrame
 # ==========================
+
 input_data = pd.DataFrame({
-    "age": [age * 365],  # tu dataset usa días
+    "age": [age * 365],    # Tu dataset usa edad en días
     "height": [height],
     "weight": [weight],
     "ap_hi": [ap_hi],
@@ -54,17 +74,23 @@ input_data = pd.DataFrame({
 # Predicción
 # ==========================
 if st.button("Predecir riesgo"):
-    pred = model.predict(input_data)[0]
-
-    if pred == 1:
-        st.error("⚠️ El modelo predice: **Con riesgo cardiovascular**")
-    else:
-        st.success("✅ El modelo predice: **Sin riesgo cardiovascular**")
-
-    # Probabilidades (si tu modelo las soporta)
+    
     try:
-        prob = model.predict_proba(input_data)[0][1]
-        st.write(f"Probabilidad estimada: **{prob:.2f}**")
-    except:
+        pred = model.predict(input_data)[0]
 
-        pass
+        # Mostrar predicción
+        if pred == 1:
+            st.error("⚠️ El modelo predice: **Con riesgo cardiovascular**")
+        else:
+            st.success("✅ El modelo predice: **Sin riesgo cardiovascular**")
+
+        # Probabilidades
+        try:
+            prob = model.predict_proba(input_data)[0][1]
+            st.write(f"Probabilidad estimada: **{prob:.2f}**")
+        except:
+            st.info("El modelo no soporta predict_proba().")
+
+    except Exception as e:
+        st.error("❌ Error durante la predicción.")
+        st.code(str(e))
