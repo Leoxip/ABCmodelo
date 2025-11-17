@@ -5,18 +5,24 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import json
 
-# ==========================
+# =====================================================
 # Configuración de la página
-# ==========================
-st.set_page_config(page_title="Predicción Cardiovascular", page_icon="❤️", layout="wide")
+# =====================================================
+st.set_page_config(
+    page_title="Predicción Cardiovascular",
+    page_icon="❤️",
+    layout="wide"
+)
 
 st.title("❤️ Predicción de Riesgo Cardiovascular")
-st.write("Aplicación web con modelo MLP entrenado por Mayra.")
+st.write("Aplicación con modelo MLP entrenado por Mayra.")
 
-# ==========================
+
+# =====================================================
 # Cargar modelo
-# ==========================
+# =====================================================
 ARTIFACT_PATH = "Artefactos/v1/pipeline_MLP.joblib"
 
 @st.cache_resource
@@ -29,19 +35,15 @@ def load_model():
 model = load_model()
 
 
-# ==============================================
-#             CREAR TABS (pestañas)
-# ==============================================
-tab1, tab2, tab3 = st.tabs([
-    "🔮 Predicción",
-    "📊 Gráficos del Modelo",
-    "📘 Interpretación"
-])
+# =====================================================
+# Crear TABS
+# =====================================================
+tab1, tab2, tab3 = st.tabs(["🔮 Predicción", "📊 Gráficos", "📘 Interpretación"])
 
 
-# ============================================================
-#                       TAB 1 – PREDICCIÓN
-# ============================================================
+# =====================================================
+# TAB 1 - PREDICCIÓN
+# =====================================================
 with tab1:
     st.header("🔮 Predicción de riesgo")
 
@@ -61,9 +63,15 @@ with tab1:
         alco = st.selectbox("Consume alcohol", ["No consume alcohol", "Consume alcohol"])
         active = st.selectbox("Actividad física", ["Activo", "Inactivo"])
 
-    # Preparar entrada
+    # =====================================================
+    # Preparar DataFrame EXACTO como lo espera el modelo
+    # (incluye: id y gender)
+    # =====================================================
+
     input_data = pd.DataFrame({
-        "age": [age * 365],
+        "id": [0],                       # Modelo lo requiere
+        "age": [age * 365],              # El dataset original usa días
+        "gender": ["Hombre"],           # Fijo (modelo lo pide pero no afecta)
         "height": [height],
         "weight": [weight],
         "ap_hi": [ap_hi],
@@ -75,38 +83,44 @@ with tab1:
         "active": [active]
     })
 
+    # Botón de predicción
     if st.button("Predecir riesgo"):
-        pred = model.predict(input_data)[0]
-        proba = model.predict_proba(input_data)[0][1]
 
-        if pred == 1:
-            st.error(f"⚠️ Riesgo cardiovascular — probabilidad {proba:.2f}")
-        else:
-            st.success(f"✅ Sin riesgo — probabilidad {proba:.2f}")
+        try:
+            pred = model.predict(input_data)[0]
+            proba = model.predict_proba(input_data)[0][1]
+
+            if pred == 1:
+                st.error(f"⚠️ Riesgo cardiovascular — Probabilidad: {proba:.2f}")
+            else:
+                st.success(f"✅ Sin riesgo — Probabilidad: {proba:.2f}")
+
+        except Exception as e:
+            st.error("❌ Error durante la predicción.")
+            st.code(str(e))
 
 
-# ============================================================
-#               TAB 2 – GRÁFICOS DEL MODELO
-# ============================================================
+# =====================================================
+# TAB 2 - GRÁFICOS
+# =====================================================
 with tab2:
-    st.header("📊 Análisis Visual del Modelo")
+    st.header("📊 Gráficos del Modelo")
 
-    # Mostrar matriz de confusión si existe el archivo
     try:
-        import json
         with open("Artefactos/v1/decision_policy.json") as f:
             dp = json.load(f)
 
         cm = np.array(dp["confusion_matrix"])
         labels = ["Sin riesgo", "Con riesgo"]
 
-        fig, ax = plt.subplots()
+        # ===== Matriz de confusión =====
+        fig1, ax1 = plt.subplots()
         sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=labels, yticklabels=labels, ax=ax)
-        ax.set_title("Matriz de Confusión")
-        st.pyplot(fig)
+                    xticklabels=labels, yticklabels=labels, ax=ax1)
+        ax1.set_title("Matriz de Confusión")
+        st.pyplot(fig1)
 
-        # Gráfico de barras de métricas
+        # ===== Gráfico de métricas =====
         metrics = dp["test_metrics"]
         fig2, ax2 = plt.subplots()
         sns.barplot(x=list(metrics.keys()), y=list(metrics.values()), ax=ax2)
@@ -115,28 +129,28 @@ with tab2:
         st.pyplot(fig2)
 
     except Exception as e:
-        st.warning("⚠ No se pudieron cargar los gráficos del modelo.")
+        st.warning("⚠ No se pudieron cargar los gráficos.")
         st.code(str(e))
 
 
-# ============================================================
-#               TAB 3 – INTERPRETACIÓN DEL MODELO
-# ============================================================
+# =====================================================
+# TAB 3 - INTERPRETACIÓN
+# =====================================================
 with tab3:
-    st.header("📘 Interpretación de Resultados")
+    st.header("📘 Interpretación del Modelo")
 
-    st.subheader("🔍 Lectura de métricas")
     st.write("""
-    - **Accuracy** indica el porcentaje de aciertos totales.  
-    - **Precision** mide cuántas predicciones positivas fueron correctas.  
-    - **Recall** mide la capacidad del modelo para detectar casos con riesgo.  
-    - **F1-score** combina precisión y recall.  
-    - **ROC-AUC** mide qué tan bien separa clases.  
+    ### 🔍 ¿Cómo interpretar las métricas?
+
+    - **Accuracy** → Qué porcentaje total se predijo bien.  
+    - **Precision** → De los que predije como con riesgo, cuántos realmente lo eran.  
+    - **Recall** → Qué tan bien detecta los casos con riesgo.  
+    - **F1-score** → Balance entre precision y recall.  
+    - **ROC-AUC** → Qué tan bien separa la clase positiva y negativa.  
     """)
 
     try:
         st.subheader("📈 Métricas del modelo")
         st.json(dp["test_metrics"])
-
     except:
         st.warning("No se encontró el archivo de métricas.")
