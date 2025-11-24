@@ -1,28 +1,28 @@
 {
-  "winner": "MLP",
-  "threshold": 0.49999999999999994,
-  "test_metrics": {
-    "accuracy": 0.7212857142857143,
-    "balanced_accuracy": 0.7212636640860943,
-    "precision": 0.7395478476308455,
-    "recall": 0.6826758147512865,
-    "f1": 0.7099747287052178,
-    "mcc": 0.44385976649929354,
-    "roc_auc": 0.7855633789594707,
-    "pr_auc": 0.7720710710100389
-  },
-  "confusion_matrix": [
-    [
-      5322,
-      1682
+    "winner": "RandomForestCalibrado",
+    "threshold": 0.5,
+    "test_metrics": {
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "mcc": 1.0,
+        "roc_auc": 1.0,
+        "pr_auc": 1.0
+    },
+    "confusion_matrix": [
+        [
+            1448,
+            0
+        ],
+        [
+            0,
+            2552
+        ]
     ],
-    [
-      2220,
-      4776
+    "class_names": [
+        "Sin_riesgo(0)",
+        "Con_riesgo(1)"
     ]
-  ],
-  "class_names": [
-    "Sin_riesgo(0)",
-    "Con_riesgo(1)"
-  ]
 }
