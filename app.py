@@ -75,7 +75,7 @@ with tab1:
         active = st.selectbox("Actividad física", ["Activo", "Inactivo"])
 
     # =====================================================
-    # CREACIÓN DEL DATAFRAME PARA EL MODELO
+    # CREAR DATA
     # =====================================================
     input_data = pd.DataFrame({
         "gender": [gender],
@@ -92,7 +92,6 @@ with tab1:
     })
 
     input_data["BMI"] = input_data["weight"] / ((input_data["height"] / 100) ** 2)
-    input_data["age_years"] = age
 
 
     # =====================================================
@@ -104,37 +103,25 @@ with tab1:
             proba = float(model.predict_proba(input_data)[0][1])
             pred = 1 if proba >= 0.50 else 0
 
-            # Resultado textual
+            # Resultado
             if pred == 1:
                 st.error(f"⚠️ Riesgo cardiovascular — Probabilidad asignada: {proba:.2f}")
             else:
                 st.success(f"✅ Sin riesgo — Probabilidad asignada: {proba:.2f}")
 
             # =====================================================
-            # INFORME INTERPRETADO
+            # INFORME
             # =====================================================
             st.subheader("📄 Informe interpretado del resultado")
 
             st.info(f"""
 ### 📌 Interpretación de la probabilidad obtenida
 
-El modelo asignó una probabilidad de **{proba:.2f}**, lo que significa:
+El modelo asignó **{proba:.2f}**, lo que significa:
 
-- 👉 **{proba:.0%} de confianza del modelo en su predicción actual**.  
-- ❗ **NO significa {proba:.0%} de riesgo real clínico**.  
-- Es una probabilidad matemática proveniente del modelo RandomForest calibrado.
-- La decisión final se basa en un umbral de **0.50**.
-
-### 📌 Factores considerados por el modelo
-- Edad  
-- Presión arterial (sistólica y diastólica)  
-- Índice de masa corporal (BMI)  
-- Colesterol y glucosa  
-- Hábitos de fumar y consumo de alcohol  
-- Actividad física  
-- Sexo  
-
-Cada factor aporta un peso distinto en la probabilidad final.
+- 👉 **{proba:.0%} de confianza del modelo en su predicción actual**  
+- ❗ **NO representa el porcentaje real de riesgo clínico**  
+- Es una probabilidad basada en un modelo RandomForest calibrado  
 """)
 
             # =====================================================
@@ -159,7 +146,7 @@ Cada factor aporta un peso distinto en la probabilidad final.
             st.pyplot(fig)
 
             # =====================================================
-            # PERFIL RADIAL DEL PACIENTE
+            # RADIAL CORREGIDO
             # =====================================================
             st.subheader("📊 Perfil del paciente (Radial)")
 
@@ -173,20 +160,20 @@ Cada factor aporta un peso distinto en la probabilidad final.
                 1 if active == "Activo" else 0
             ]
 
-            vals = np.concatenate((factor_vals, [factor_vals[0]]))
-            angles = np.linspace(0, 2 * np.pi, len(factor_labels), endpoint=False)
-            angles = np.concatenate((angles, [angles[0]]))
+            vals_closed = factor_vals + [factor_vals[0]]
+            angles = np.linspace(0, 2*np.pi, len(vals_closed))
 
             fig_r, ax_r = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
-            ax_r.plot(angles, vals, "o-", linewidth=2)
-            ax_r.fill(angles, vals, alpha=0.25)
-            ax_r.set_thetagrids(angles * 180/np.pi, factor_labels)
+            ax_r.plot(angles, vals_closed, "o-", linewidth=2)
+            ax_r.fill(angles, vals_closed, alpha=0.25)
+            ax_r.set_thetagrids(angles[:-1] * 180/np.pi, factor_labels)
 
             st.pyplot(fig_r)
 
         except Exception as e:
             st.error("Error durante la predicción.")
             st.code(str(e))
+
 
 
 # =====================================================
@@ -203,14 +190,12 @@ with tab2:
         cm = np.array(dp["confusion_matrix"])
         labels = ["Sin riesgo", "Con riesgo"]
 
-        # Matriz de confusión
         fig1, ax1 = plt.subplots()
         sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
                     xticklabels=labels, yticklabels=labels, ax=ax1)
         ax1.set_title("Matriz de Confusión")
         st.pyplot(fig1)
 
-        # Métricas
         metrics = dp["test_metrics"]
         fig2, ax2 = plt.subplots()
         sns.barplot(x=list(metrics.keys()), y=list(metrics.values()), ax=ax2)
@@ -228,14 +213,14 @@ with tab2:
 # =====================================================
 with tab3:
 
-    st.header("📘 Explicación de métricas del modelo")
+    st.header("📘 Interpretación de métricas del modelo")
 
     st.write("""
     **Accuracy:** Qué porcentaje total de predicciones acertó el modelo.  
     **Precision:** Qué tan correctas son las predicciones positivas.  
     **Recall:** Capacidad del modelo para detectar casos de riesgo.  
     **F1-score:** Equilibrio entre precisión y recall.  
-    **ROC-AUC:** Qué tan bien separa las clases (0 = azar, 1 = perfecto).  
+    **ROC-AUC:** Qué tan bien separa las clases.  
     """)
 
     try:
