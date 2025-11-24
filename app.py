@@ -18,11 +18,21 @@ st.set_page_config(
 
 st.title("❤️ Predicción de Riesgo Cardiovascular")
 
+st.write("""
+Esta aplicación utiliza un **modelo de Machine Learning (Random Forest calibrado)** 
+para estimar la probabilidad de que una persona pertenezca al **grupo de riesgo cardiovascular**.
+
+⚠ **Importante:**  
+La probabilidad mostrada representa la **confianza del modelo**, NO un porcentaje médico real
+de riesgo. El modelo clasifica según patrones aprendidos en los datos, pero **no reemplaza una
+evaluación clínica profesional**.
+""")
+
 
 # =====================================================
 # CARGAR MODELO
 # =====================================================
-MODEL_PATH = "Artefactos/v1/pipeline_MLP.joblib"
+MODEL_PATH = "Artefactos/v1/pipeline_RF.joblib"
 
 @st.cache_resource
 def load_model():
@@ -50,6 +60,7 @@ with tab1:
     col1, col2 = st.columns(2)
 
     with col1:
+        gender = st.selectbox("Sexo", ["Hombre", "Mujer"])
         age = st.number_input("Edad (años)", 18, 100, 50)
         height = st.number_input("Altura (cm)", 120, 220, 165)
         weight = st.number_input("Peso (kg)", 40.0, 200.0, 70.0)
@@ -64,12 +75,11 @@ with tab1:
         active = st.selectbox("Actividad física", ["Activo", "Inactivo"])
 
     # =====================================================
-    # CREAR DATA EXACTA QUE ESPERA EL MODELO
+    # CREACIÓN DEL DATAFRAME PARA EL MODELO
     # =====================================================
     input_data = pd.DataFrame({
-        "id": [0],
-        "age": [age * 365],
-        "gender": ["Hombre"],  
+        "gender": [gender],
+        "age_years": [age],
         "height": [height],
         "weight": [weight],
         "ap_hi": [ap_hi],
@@ -78,12 +88,12 @@ with tab1:
         "gluc": [gluc],
         "smoke": [smoke],
         "alco": [alco],
-        "active": [active]
+        "active": [active],
     })
 
-    # ➕ Agregar columnas que el modelo espera
-    input_data["age_years"] = input_data["age"] / 365
-    input_data["BMI"] = input_data["weight"] / ((input_data["height"] / 100)**2)
+    input_data["BMI"] = input_data["weight"] / ((input_data["height"] / 100) ** 2)
+    input_data["age_years"] = age
+
 
     # =====================================================
     # BOTÓN DE PREDICCIÓN
@@ -91,54 +101,88 @@ with tab1:
     if st.button("Predecir riesgo", use_container_width=True):
 
         try:
-            pred = model.predict(input_data)[0]
             proba = float(model.predict_proba(input_data)[0][1])
+            pred = 1 if proba >= 0.50 else 0
 
             # Resultado textual
             if pred == 1:
-                st.error(f"⚠️ Riesgo cardiovascular — Probabilidad: {proba:.2f}")
+                st.error(f"⚠️ Riesgo cardiovascular — Probabilidad asignada: {proba:.2f}")
             else:
-                st.success(f"✅ Sin riesgo — Probabilidad: {proba:.2f}")
+                st.success(f"✅ Sin riesgo — Probabilidad asignada: {proba:.2f}")
 
             # =====================================================
-            # GRAFICO DE VELOCÍMETRO (GAUGE)
+            # INFORME INTERPRETADO
             # =====================================================
-            fig, ax = plt.subplots(figsize=(5, 3))
+            st.subheader("📄 Informe interpretado del resultado")
 
+            st.info(f"""
+### 📌 Interpretación de la probabilidad obtenida
+
+El modelo asignó una probabilidad de **{proba:.2f}**, lo que significa:
+
+- 👉 **{proba:.0%} de confianza del modelo en su predicción actual**.  
+- ❗ **NO significa {proba:.0%} de riesgo real clínico**.  
+- Es una probabilidad matemática proveniente del modelo RandomForest calibrado.
+- La decisión final se basa en un umbral de **0.50**.
+
+### 📌 Factores considerados por el modelo
+- Edad  
+- Presión arterial (sistólica y diastólica)  
+- Índice de masa corporal (BMI)  
+- Colesterol y glucosa  
+- Hábitos de fumar y consumo de alcohol  
+- Actividad física  
+- Sexo  
+
+Cada factor aporta un peso distinto en la probabilidad final.
+""")
+
+            # =====================================================
+            # GAUGE
+            # =====================================================
+            st.subheader("📊 Indicador de riesgo (Gauge)")
+
+            fig, ax = plt.subplots(figsize=(6, 2))
             ax.axis("off")
-            ax.annotate(
-                "", xy=(0.5, 0), xytext=(0.5, -0.2),
-                arrowprops=dict(arrowstyle="<-", lw=2)
-            )
 
-            # Barras del gauge
             colors = ["green", "yellow", "orange", "red"]
             thresholds = [0.25, 0.50, 0.75, 1.0]
 
             start = 0
             for c, t in zip(colors, thresholds):
-                ax.barh(0, t - start, left=start, height=0.2, color=c)
+                ax.barh(0, t - start, left=start, height=0.30, color=c)
                 start = t
 
-            # Aguja
-            ax.plot([proba], [0.1], marker="v", markersize=12, color="black")
-            ax.text(proba, 0.25, f"{proba:.2f}", ha="center")
+            ax.plot(proba, 0.15, marker="v", markersize=14, color="black")
+            ax.text(proba, 0.42, f"{proba:.2f}", ha="center", fontsize=12)
 
             st.pyplot(fig)
 
             # =====================================================
-            # INTERPRETACIÓN AUTOMÁTICA
+            # PERFIL RADIAL DEL PACIENTE
             # =====================================================
-            st.subheader("🧠 Interpretación automática")
+            st.subheader("📊 Perfil del paciente (Radial)")
 
-            if proba < 0.25:
-                st.success("✔ Riesgo muy bajo.")
-            elif proba < 0.50:
-                st.info("ℹ Riesgo bajo-moderado.")
-            elif proba < 0.75:
-                st.warning("⚠ Riesgo moderado.")
-            else:
-                st.error("❗ Riesgo alto. Se recomienda atención.")
+            factor_labels = ["Edad", "PS Sistólica", "Colesterol", "Glucosa", "Fuma", "Actividad"]
+            factor_vals = [
+                age / 100,
+                ap_hi / 200,
+                ["Normal", "Medio", "Alto"].index(cholesterol) / 2,
+                ["Normal", "Elevada", "Muy Elevada"].index(gluc) / 2,
+                1 if smoke == "Fuma" else 0,
+                1 if active == "Activo" else 0
+            ]
+
+            vals = np.concatenate((factor_vals, [factor_vals[0]]))
+            angles = np.linspace(0, 2 * np.pi, len(factor_labels), endpoint=False)
+            angles = np.concatenate((angles, [angles[0]]))
+
+            fig_r, ax_r = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+            ax_r.plot(angles, vals, "o-", linewidth=2)
+            ax_r.fill(angles, vals, alpha=0.25)
+            ax_r.set_thetagrids(angles * 180/np.pi, factor_labels)
+
+            st.pyplot(fig_r)
 
         except Exception as e:
             st.error("Error durante la predicción.")
@@ -175,7 +219,7 @@ with tab2:
         st.pyplot(fig2)
 
     except Exception as e:
-        st.warning("No se pudieron cargar los gráficos")
+        st.warning("No se pudieron cargar los gráficos.")
         st.code(str(e))
 
 
@@ -184,14 +228,14 @@ with tab2:
 # =====================================================
 with tab3:
 
-    st.header("📘 Explicación de métricas")
+    st.header("📘 Explicación de métricas del modelo")
 
     st.write("""
-    - **Accuracy** → Precisión general del modelo.  
-    - **Precision** → Qué tan correctas son las predicciones positivas.  
-    - **Recall** → Capacidad para detectar casos con riesgo.  
-    - **F1-score** → Balance entre precision y recall.  
-    - **ROC-AUC** → Qué tan bien separa las clases.  
+    **Accuracy:** Qué porcentaje total de predicciones acertó el modelo.  
+    **Precision:** Qué tan correctas son las predicciones positivas.  
+    **Recall:** Capacidad del modelo para detectar casos de riesgo.  
+    **F1-score:** Equilibrio entre precisión y recall.  
+    **ROC-AUC:** Qué tan bien separa las clases (0 = azar, 1 = perfecto).  
     """)
 
     try:
